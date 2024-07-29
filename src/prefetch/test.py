@@ -87,6 +87,7 @@ if __name__ == "__main__":
     positive_ids_list = []
     candidates_list = []
     query_time_list = []
+    mrr_total = 0  # Initialize total MRR
     
     for count, example in enumerate(tqdm(corpus)):
 
@@ -113,6 +114,12 @@ if __name__ == "__main__":
 
         positive_ids_list.append(example["positive_ids"])
         candidates_list.append(candidates)
+        
+        # Calculate reciprocal rank for MRR
+        for pos, candidate_id in enumerate(candidates):
+            if candidate_id in example["positive_ids"]:
+                mrr_total += 1 / (pos + 1)
+                break
             
     precision_at_K = {}
     recall_at_K ={}
@@ -127,10 +134,11 @@ if __name__ == "__main__":
         recall_at_K[K] = np.mean(recall_list)
         precision_at_K[K] = np.mean( precision_list )
         F_at_K[K] = 2/( 1/(recall_at_K[K] + 1e-12) + 1/(precision_at_K[K]  + 1e-12  ) )
+    
+    mrr = mrr_total / len(corpus)  # Calculate mean reciprocal rank
     ckpt_name = str(ckpt_name)
-    print({ "ckpt_name": ckpt_name, "recall":recall_at_K }, flush = True)
-    LOG( json.dumps( { "ckpt_name": ckpt_name, "recall":recall_at_K } ) )
-    print("Finished!", flush = True)
+    print({"ckpt_name": ckpt_name, "recall": recall_at_K, "mrr": mrr}, flush=True)
+    LOG(json.dumps({"ckpt_name": ckpt_name, "recall": recall_at_K, "mrr": mrr}))
+    print("Finished!", flush=True)
     LOG("Finished!")
-
 
