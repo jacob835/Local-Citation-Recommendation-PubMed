@@ -18,7 +18,7 @@ class Prefetcher:
                    embedding_path,
                    gpu_list = [],
                    vocab_path = "model/glove/vocabulary_200dim.pkl",
-                   embed_dim = 200,
+                   embed_dim = 50,
                    num_heads = 8,
                    hidden_dim = 1024,
                    max_seq_len = 512,
