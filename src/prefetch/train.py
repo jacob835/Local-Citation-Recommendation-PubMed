@@ -76,7 +76,7 @@ if __name__ == "__main__":
     parser.add_argument("-similarity", default = "cosine"  )
     parser.add_argument("-positive_irrelevance_levels", type = int, nargs = "+", default = [1,2])
     parser.add_argument("-max_num_checkpoints", type = int, default = 20  )
-    parser.add_argument("-embed_dim", type = int, default = 200  )
+    parser.add_argument("-embed_dim", type = int, default = 1  )
     parser.add_argument("-num_heads", type = int, default = 8 )
     parser.add_argument("-hidden_dim", type = int, default = 1024  )
     parser.add_argument("-max_seq_len", type = int, default = 512  )
