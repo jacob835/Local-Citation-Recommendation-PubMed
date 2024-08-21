@@ -75,51 +75,55 @@ class Reranker:
                  model_path,
                  gpu_list = [],
                  initial_model_path = "allenai/scibert_scivocab_uncased" ):
-        self.tokenizer = AutoTokenizer.from_pretrained( initial_model_path )
-        self.tokenizer.add_special_tokens( { 'additional_special_tokens': ['<cit>','<sep>','<eos>'] } )
-        vocab_size = len( self.tokenizer )
+        self.tokenizer = AutoTokenizer.from_pretrained(initial_model_path)
+        self.tokenizer.add_special_tokens({'additional_special_tokens': ['<cit>', '<sep>', '<eos>']})
+        vocab_size = len(self.tokenizer)
         
-        ckpt = torch.load( model_path,  map_location=torch.device('cpu') )
-        self.scorer = Scorer( initial_model_path, vocab_size )
-        self.scorer.load_state_dict( ckpt["scorer"] )
+        ckpt = torch.load(model_path, map_location=torch.device('cpu'))
+        self.scorer = Scorer(initial_model_path, vocab_size)
         
-        self.device = torch.device( "cuda:%d"%(gpu_list[0]) if torch.cuda.is_available() and len(gpu_list) > 0 else "cpu"  )
+        # Assuming the checkpoint contains the model weights directly
+        self.scorer.load_state_dict(ckpt)
+        
+        self.device = torch.device("cuda:%d" % (gpu_list[0]) if torch.cuda.is_available() and len(gpu_list) > 0 else "cpu")
         self.scorer = self.scorer.to(self.device)
 
-        if self.device.type == "cuda" and len( gpu_list ) > 1:
-            self.scorer = nn.DataParallel( self.scorer, gpu_list )
+        if self.device.type == "cuda" and len(gpu_list) > 1:
+            self.scorer = nn.DataParallel(self.scorer, gpu_list)
             
         self.sep_token = "<sep>"
     
-    def rerank(self, citing_title = "", citing_abstract="", local_context="", original_candidate_list=[ {} ], max_input_length = 512, reranking_batch_size = 50 ):
+    def rerank(self, citing_title="", citing_abstract="", local_context="", original_candidate_list=[{}], max_input_length=512, reranking_batch_size=50):
         candidate_list = original_candidate_list.copy()
         if len(candidate_list) == 0:
             return []
         
-        global_context = citing_title + " "+ citing_abstract
-        query_text = " ".join( global_context.split()[:int( max_input_length * 0.35 ) ] ) + self.sep_token + local_context
+        global_context = citing_title + " " + citing_abstract
+        query_text = " ".join(global_context.split()[:int(max_input_length * 0.35)]) + self.sep_token + local_context
         
         score_list = []
-        for pos in range( 0, len(candidate_list), reranking_batch_size ):
-            candidate_batch = candidate_list[ pos : pos + reranking_batch_size ]
-            query_text_batch = [ query_text for _ in range( len( candidate_batch ) ) ]
-            candidate_text_batch = [ item.get("title","")+" "+item.get( "abstract","" )  for item in candidate_batch ]
+        for pos in range(0, len(candidate_list), reranking_batch_size):
+            candidate_batch = candidate_list[pos: pos + reranking_batch_size]
+            query_text_batch = [query_text for _ in range(len(candidate_batch))]
+            candidate_text_batch = [item.get("title", "") + " " + item.get("abstract", "") for item in candidate_batch]
             
-            encoded_seqs = self.tokenizer( query_text_batch, candidate_text_batch,  max_length = max_input_length, padding =  "max_length" , truncation = True )
+            encoded_seqs = self.tokenizer(query_text_batch, candidate_text_batch, max_length=max_input_length, padding="max_length", truncation=True)
             for key in encoded_seqs:
-                encoded_seqs[key] = torch.from_numpy(np.asarray(encoded_seqs[key])).to( self.device )
+                encoded_seqs[key] = torch.from_numpy(np.asarray(encoded_seqs[key])).to(self.device)
             
             with torch.no_grad():
-                score_list.append(  self.scorer( {
-                        "input_ids": encoded_seqs["input_ids"] ,
-                        "token_type_ids":encoded_seqs["token_type_ids"] ,
-                        "attention_mask": encoded_seqs["attention_mask"] 
-                } ).detach()  )
-        score_list = torch.cat( score_list, dim =0 ).view(-1).cpu().numpy().tolist()
+                score_list.append(self.scorer({
+                    "input_ids": encoded_seqs["input_ids"],
+                    "token_type_ids": encoded_seqs["token_type_ids"],
+                    "attention_mask": encoded_seqs["attention_mask"]
+                }).detach())
         
-        candidate_list, _ =  list(zip(*sorted( zip( candidate_list,  score_list ), key = lambda x: -x[1])))
+        score_list = torch.cat(score_list, dim=0).view(-1).cpu().numpy().tolist()
         
-        return candidate_list 
+        candidate_list, _ = list(zip(*sorted(zip(candidate_list, score_list), key=lambda x: -x[1])))
+        
+        return candidate_list
+
     
     
     
