@@ -16,17 +16,16 @@ class Scorer(nn.Module):
     def forward(self, inputs):
         net = self.bert_model(**inputs)[0]
         net = net[:, 0, :].contiguous()
-        score = torch.sigmoid(self.ln_score(F.relu(net))).squeeze(1)
+        score = torch.sigmoid(self.ln_score(nn.functional.relu(net))).squeeze(1)
         return score
 
     def load_state_dict(self, state_dict, strict=True):
-        # Remove the 'bert_model.' prefix from keys in state_dict if present
+        # Create a new state_dict with keys adjusted to match the model
         new_state_dict = {}
         for key in state_dict.keys():
-            if key.startswith('bert_model.'):
-                new_key = key[len('bert_model.'):]
-            else:
-                new_key = key
+            new_key = 'bert_model.' + key if not key.startswith('bert_model.') else key
             new_state_dict[new_key] = state_dict[key]
+
+        # Use the adjusted state_dict to load the model weights
         super().load_state_dict(new_state_dict, strict)
  
